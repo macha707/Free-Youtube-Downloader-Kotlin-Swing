@@ -8,14 +8,16 @@ import javax.swing.JTextField
 
 fun getSpeedText(startTime: Long, downloadedSize: Long): String {
   val decimalFormat = DecimalFormat("#.##", DecimalFormatSymbols(Locale.US))
-  val time = (System.nanoTime() - startTime) / 1000000000.0
-  val bytesPerSec = downloadedSize / time
+  val timeInSeconds = (System.nanoTime() - startTime) / 1_000_000_000.0
+  val bytesPerSec = downloadedSize / timeInSeconds
   var text = decimalFormat.format(bytesPerSec) + "B/s"
   if (bytesPerSec > 1024) {
-    val kbPerSec = downloadedSize / 1024.0 / time
+    val downloadSizeInKb = downloadedSize / 1024.0
+    val kbPerSec = downloadSizeInKb / timeInSeconds
     text = decimalFormat.format(kbPerSec) + " KB/s"
     if (kbPerSec > 1024) {
-      val mbPerSec = downloadedSize / 1024.0 / 1024.0 / time
+      val downloadSizeInMb = downloadSizeInKb / 1024.0
+      val mbPerSec = downloadSizeInMb / timeInSeconds
       text = decimalFormat.format(mbPerSec) + " MB/s"
     }
   }
