@@ -6,6 +6,22 @@ import java.text.StringCharacterIterator
 import java.util.*
 import javax.swing.JTextField
 
+fun getSpeedText(startTime: Long, downloadedSize: Long): String {
+  val decimalFormat = DecimalFormat("#.##", DecimalFormatSymbols(Locale.US))
+  val time = (System.nanoTime() - startTime) / 1000000000.0
+  val bytesPerSec = downloadedSize / time
+  var text = decimalFormat.format(bytesPerSec) + "B/s"
+  if (bytesPerSec > 1024) {
+    val kbPerSec = downloadedSize / 1024.0 / time
+    text = decimalFormat.format(kbPerSec) + " KB/s"
+    if (kbPerSec > 1024) {
+      val mbPerSec = downloadedSize / 1024.0 / 1024.0 / time
+      text = decimalFormat.format(mbPerSec) + " MB/s"
+    }
+  }
+  return text
+}
+
 fun Long.humanReadableSize(): String {
   val absB = if (this == Long.MIN_VALUE) Long.MAX_VALUE else Math.abs(this)
   if (absB < 1024) {
@@ -23,23 +39,7 @@ fun Long.humanReadableSize(): String {
   return String.format("%.1f %ciB", value / 1024.0, ci.current())
 }
 
-fun getSpeedText(startTime: Long, downloadedSize: Long): String {
-  val decimalFormat = DecimalFormat("#.##", DecimalFormatSymbols(Locale.US))
-  val time = (System.nanoTime() - startTime) / 1000000000.0
-  val bytesPerSec = downloadedSize / time
-  var text = decimalFormat.format(bytesPerSec) + "B/s"
-  if (bytesPerSec > 1024) {
-    val kbPerSec = downloadedSize / 1024.0 / time
-    text = decimalFormat.format(kbPerSec) + " KB/s"
-    if (kbPerSec > 1024) {
-      val mbPerSec = downloadedSize / 1024.0 / 1024.0 / time
-      text = decimalFormat.format(mbPerSec) + " MB/s"
-    }
-  }
-  return text
-}
-
 
 var JTextField.placeholder: String
-  get() = this.getClientProperty("JTextField.placeholderText").toString()
+  get() = this.getClientProperty("JTextField.placeholderText")?.toString() ?: ""
   set(value) = this.putClientProperty("JTextField.placeholderText", value)
