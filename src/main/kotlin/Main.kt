@@ -1,74 +1,121 @@
 import com.formdev.flatlaf.FlatDarculaLaf
-import models.NewUrlData
-import models.NewPlaylistData
-import panels.CenterPanel
-import panels.NorthPanel
-import panels.SouthPanel
+import models.*
 import services.Downloader
-import java.awt.*
+import ui.AboutDialog
+import ui.CenterPanel
+import ui.NorthPanel
+import ui.PreferencesDialog
+import utils.Constants
+import java.awt.BorderLayout
+import java.awt.Dimension
+import java.awt.Toolkit
+import java.io.File
 import javax.swing.*
 
 
 fun main() {
   FlatDarculaLaf.setup()
 
-  JFrame("Free Youtube Downloader").apply {
+  val frame = JFrame("Free Youtube Downloader").apply frame@ {
     defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
-    preferredSize = Dimension(850, 450)
-
-    val downloader = Downloader()
-    val northLayout = NorthPanel()
-    val centerLayout = CenterPanel(downloader.videos)
-    val southLayout = SouthPanel()
-
-    add(northLayout, BorderLayout.NORTH)
-    add(centerLayout, BorderLayout.CENTER)
-    add(southLayout, BorderLayout.SOUTH)
-
-    downloader.subscribe {
-      when (it.propertyName) {
-        "AVAILABLE_QUALITIES" -> {
-          southLayout.updateQualities(it.newValue as List<String>)
-        }
-
-        "VIDEO_ADDED" -> {
-          centerLayout.addVideo(it.newValue as Int)
-        }
-
-        "QUALITY_UPDATED" -> {
-          centerLayout.updateVideoSize(it.newValue as Int)
-        }
-
-        "NEW_PLAYLIST" -> {
-          val data = it.newValue as NewPlaylistData
-          southLayout.updateDownloadFolder(data.title)
-          northLayout.disable(data.isParsing)
-          southLayout.disable(data.isParsing)
-        }
-
-        "UPDATE_PROGRESS" -> {
-          centerLayout.updateProgress(it.newValue as Int)
-        }
-      }
+    minimumSize = Dimension(500, 450)
+    preferredSize = Dimension(600, 550)
+    jMenuBar = JMenuBar().apply {
+      add(JMenu("Help").apply {
+        add(JMenuItem("Preferences").apply {
+          addActionListener {
+            PreferencesDialog(this@frame).isVisible = true
+          }
+        })
+        add(JSeparator())
+        add(JMenuItem("About").apply {
+          addActionListener {
+            AboutDialog(this@frame).isVisible = true
+          }
+        })
+      })
     }
 
-    northLayout.addPropertyChangeListener {
-      if (it.propertyName == "NEW_URL") {
-        val data = it.newValue as NewUrlData
-        downloader.parse(data.id, data.isPlaylist)
-      }
+    iconImages = arrayOf("16", "24", "32", "48", "64", "72", "96", "128").map {
+      Toolkit.getDefaultToolkit().getImage(Constants.javaClass.classLoader.getResource("icons/icon${it}.png"))
     }
-
-    southLayout.addPropertyChangeListener {
-      if (it.propertyName == "CHANGE_DOWNLOAD_QUALITY") {
-        downloader.updateQuality(it.newValue.toString())
-      } else if (it.propertyName == "START_DOWNLOAD") {
-        downloader.startDownload(it.newValue.toString())
-      }
-    }
-
-    pack()
-    setLocationRelativeTo(null)
-    isVisible = true
   }
+
+  val northLayout = NorthPanel(frame)
+  val centerLayout = CenterPanel()
+
+  Downloader.subscribe {
+    when (it.propertyName) {
+      "VIDEO_ADDED" -> {
+        centerLayout.addVideo(it.newValue as VideoItem)
+      }
+
+      "NEW_PLAYLIST" -> {
+        val data = it.newValue as NewPlaylistResponse
+        northLayout.disable(data.isParsing)
+      }
+
+      "NEW_VIDEO" -> {
+        val isParsing = it.newValue as Boolean
+        northLayout.disable(isParsing)
+      }
+
+      "UPDATE_PROGRESS" -> {
+        centerLayout.updateItemState(it.newValue as Int)
+      }
+
+      "DOWNLOADING" -> {
+        val isDownloading = it.newValue as Boolean
+        northLayout.disable(isDownloading)
+      }
+    }
+  }
+  northLayout.addPropertyChangeListener {
+    when (it.propertyName) {
+      "NEW_URL" -> {
+        Downloader.parse(it.newValue as NewUrlRequest)
+      }
+
+      "CHANGE_DOWNLOAD_LOCATION" -> {
+        centerLayout.updateDownloadLocation(it.newValue as File)
+      }
+
+      "CHANGE_DOWNLOAD_QUALITY" -> {
+        centerLayout.updateSelectedQuality(it.newValue as Quality)
+      }
+
+      "START_DOWNLOAD" -> {
+        Downloader.startDownload(centerLayout.videos)
+      }
+    }
+  }
+  centerLayout.addPropertyChangeListener {
+    when (it.propertyName) {
+      "UPDATE_TOTAL_DOWNLOAD_SIZE" -> {
+        northLayout.updateDownloadSize(it.newValue as Long)
+      }
+
+      "UPDATE_AVAILABLE_QUALITIES" -> {
+        northLayout.updateQualities(it.newValue as List<Quality>)
+      }
+
+      "CANCEL_VIDEO" -> {
+        Downloader.cancelVideoDownload(it.newValue as VideoItem)
+      }
+    }
+  }
+
+  frame.add(northLayout, BorderLayout.NORTH)
+  frame.add(centerLayout, BorderLayout.CENTER)
+
+  frame.pack()
+  frame.setLocationRelativeTo(null)
+  frame.isVisible = true
+
+//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=mkggXE5e2yk", File(UserPreferences.DOWNLOADS_FOLDER)))
+//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=LXb3EKWsInQ", File(UserPreferences.DOWNLOADS_FOLDER)))
+//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=2Xmibe4YhpQ", File(UserPreferences.DOWNLOADS_FOLDER)))
+//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=1La4QzGeaaQ", File(UserPreferences.DOWNLOADS_FOLDER)))
+
 }
+

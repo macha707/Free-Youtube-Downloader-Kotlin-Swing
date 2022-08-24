@@ -31,9 +31,9 @@ class GBHelper : GridBagConstraints() {
   /* Expandable Width.  Returns new helper allowing horizontal expansion.
        A new helper is created so the expansion values don't
        pollute the origin helper. */
-  fun expandW(): GBHelper {
+  fun expandW(by: Double = 1.0): GBHelper {
     val duplicate = clone() as GBHelper
-    duplicate.weightx = 1.0
+    duplicate.weightx = by
     return duplicate
   }
 
@@ -50,6 +50,7 @@ class GBHelper : GridBagConstraints() {
   fun width(colsWide: Int): GBHelper {
     val duplicate = clone() as GBHelper
     duplicate.gridwidth = colsWide
+    gridx += colsWide - 1
     return duplicate
   }
 
@@ -83,6 +84,12 @@ class GBHelper : GridBagConstraints() {
     val duplicate = clone() as GBHelper
     duplicate.fill = NONE
     duplicate.anchor = alignment
+    return duplicate
+  }
+
+  fun fill(direction: Int) : GBHelper {
+    val duplicate = clone() as GBHelper
+    duplicate.fill = direction
     return duplicate
   }
 

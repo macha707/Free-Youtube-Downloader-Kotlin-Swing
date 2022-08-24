@@ -1,4 +1,7 @@
 package models
 
-data class NewUrlData(val id: String, val isPlaylist: Boolean)
-data class NewPlaylistData(val title: String, val isParsing: Boolean)
+import java.io.File
+
+data class NewUrlRequest(val url: String, val downloadTo: File)
+
+data class NewPlaylistResponse(val title: String, val isParsing: Boolean)

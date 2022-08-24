@@ -1,140 +1,116 @@
 package services
 
 import com.github.kiulian.downloader.YoutubeDownloader
-import com.github.kiulian.downloader.downloader.YoutubeProgressCallback
 import com.github.kiulian.downloader.downloader.request.RequestPlaylistInfo
-import com.github.kiulian.downloader.downloader.request.RequestVideoFileDownload
 import com.github.kiulian.downloader.downloader.request.RequestVideoInfo
-import com.github.kiulian.downloader.model.videos.VideoInfo
-import models.NewPlaylistData
+import models.NewPlaylistResponse
+import models.NewUrlRequest
+import models.UserPreferences
 import models.VideoItem
-import utils.getSpeedText
+import utils.Constants
 import java.beans.PropertyChangeListener
 import java.beans.PropertyChangeSupport
 import java.io.File
 import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
 
-class Downloader {
-  companion object {
-    private const val MAX_PARALLEL_DOWNLOADS = 3
-  }
+object Downloader {
 
   private val publisher = PropertyChangeSupport(this)
   private val downloader = YoutubeDownloader()
-  val videos = mutableListOf<VideoItem>()
 
-  private var downloads = 0
+  private val downloads = mutableListOf<DownloadItem>()
   private var lastIndex = 0
 
-
-  fun parse(id: String, isPlaylist: Boolean) {
-    if (!isPlaylist) parseVideo(id) else parsePlaylist(id)
-  }
-
-  private fun parseVideo(videoId: String) {
-    thread {
-      val videoInfo = downloader.getVideoInfo(RequestVideoInfo(videoId)).data()
-      videos.add(VideoItem(videoInfo = videoInfo))
-      updateAvailableQualities(videoInfo)
-      firePropertyChange("VIDEO_ADDED", null, videos.size - 1)
+  fun parse(data: NewUrlRequest) {
+    try {
+      val isPlaylist = data.url.contains("playlist")
+      val id = Regex(if (isPlaylist) Constants.PLAYLIST_ID_REGEX else Constants.VIDEO_ID_REGEX).find(data.url)!!.groupValues[2]
+      if (!isPlaylist) parseVideo(id, data.downloadTo) else parsePlaylist(id, data.downloadTo)
+    } catch (e: Exception) {
+      // TODO: Fire Error to the view
+      e.printStackTrace()
     }
   }
 
-  private fun parsePlaylist(playlistId: String) {
-    thread {
-      val request = RequestPlaylistInfo(playlistId)
-      val response = downloader.getPlaylistInfo(request)
-      val playlistInfo = response.data()
-
-      firePropertyChange("NEW_PLAYLIST", null, NewPlaylistData(playlistInfo.details().title(), true))
-
-      for (video in playlistInfo.videos()) {
-        val videoInfo = downloader.getVideoInfo(RequestVideoInfo(video.videoId())).data()
-        videos.add(VideoItem(videoInfo = videoInfo))
-        updateAvailableQualities(videoInfo)
-        firePropertyChange("VIDEO_ADDED", null, videos.size - 1)
-      }
-
-      firePropertyChange("NEW_PLAYLIST", null, NewPlaylistData(playlistInfo.details().title(), false))
-    }
+  fun startDownload(videos: List<VideoItem>) {
+    firePropertyChange("DOWNLOADING", true)
+    download(videos, lastIndex)
   }
 
-  private fun updateAvailableQualities(videoInfo: VideoInfo) {
-    firePropertyChange("AVAILABLE_QUALITIES", null, videoInfo.videoWithAudioFormats().map { it.qualityLabel() })
+  fun cancelVideoDownload(videoItem: VideoItem) {
+    downloads.firstOrNull { it.videoItem == videoItem }?.cancel()
   }
-
-
-  fun updateQuality(quality: String) {
-    for ((index, video) in videos.withIndex()) {
-      video.selectedQuality = video.videoInfo.videoWithAudioFormats().find { it.qualityLabel() == quality }
-        ?: video.videoInfo.bestVideoWithAudioFormat()
-      firePropertyChange("QUALITY_UPDATED", -1, index)
-    }
-  }
-
-  fun startDownload(folderPath: String) {
-    download(folderPath, lastIndex)
-  }
-
-  private fun download(folderPath: String, index: Int) {
-    if (downloads == MAX_PARALLEL_DOWNLOADS) {
-      lastIndex--
-      return
-    }
-
-    if (index >= videos.size) {
-      return
-    }
-
-    val downloadRequest = RequestVideoFileDownload(videos[index].selectedQuality)
-      .saveTo(File(folderPath))
-      .renameTo(videos[index].title)
-      .overwriteIfExists(true)
-      .callback(object : YoutubeProgressCallback<File> {
-        var startTime: Long = -1
-        var oldSize: Long = 0
-
-        override fun onFinished(data: File?) {
-          downloads--
-          download(folderPath, ++lastIndex)
-
-          videos[index].speed = ""
-          firePropertyChange("UPDATE_PROGRESS", null, index)
-        }
-
-        override fun onError(throwable: Throwable?) {
-        }
-
-        override fun onDownloading(progress: Int) {
-          if (startTime == -1L) {
-            startTime = System.nanoTime()
-          } else if (System.nanoTime() - startTime >= 1000000000.0) {
-            val downloadedSize = (progress / 100.0 * videos[index].size).toLong()
-            val speed: String = getSpeedText(startTime, downloadedSize - oldSize)
-            oldSize = downloadedSize
-            startTime = System.nanoTime()
-            videos[index].speed = speed
-          }
-
-          videos[index].progress = progress
-          firePropertyChange("UPDATE_PROGRESS", null, index)
-        }
-      }).async()
-    downloader.downloadVideoFile(downloadRequest)
-    downloads++
-
-    download(folderPath, ++lastIndex)
-  }
-
 
   fun subscribe(listener: PropertyChangeListener) {
     publisher.addPropertyChangeListener(listener)
   }
 
-  private fun firePropertyChange(name: String, oldValue: Any?, newValue: Any?) {
+
+  private fun parseVideo(videoId: String, downloadTo: File) {
+    thread {
+      firePropertyChange("NEW_VIDEO", true)
+      val videoInfo = downloader.getVideoInfo(RequestVideoInfo(videoId)).data()
+      val videoItem = VideoItem(videoInfo, downloadTo)
+      firePropertyChange("VIDEO_ADDED", videoItem)
+      firePropertyChange("NEW_VIDEO", false)
+    }
+  }
+
+  private fun parsePlaylist(playlistId: String, downloadTo: File) {
+    thread {
+      val request = RequestPlaylistInfo(playlistId)
+      val response = downloader.getPlaylistInfo(request)
+      val playlistInfo = response.data()
+
+      firePropertyChange("NEW_PLAYLIST", NewPlaylistResponse(playlistInfo.details().title(), true))
+
+      for (video in playlistInfo.videos()) {
+        val videoInfo = downloader.getVideoInfo(RequestVideoInfo(video.videoId())).data()
+        val videoItem = VideoItem(videoInfo, downloadTo)
+        firePropertyChange("VIDEO_ADDED", videoItem)
+      }
+
+      firePropertyChange("NEW_PLAYLIST", NewPlaylistResponse(playlistInfo.details().title(), false))
+    }
+  }
+
+  private fun download(videos: List<VideoItem>, index: Int) {
+    if (downloads.size == UserPreferences.MAX_PARALLEL_DOWNLOADS) {
+      lastIndex--
+      return
+    }
+    if (index >= videos.size) return
+
+    val downloadItem = DownloadItem(downloader, videos[index])
+      .onProgress {
+        firePropertyChange("UPDATE_PROGRESS", index)
+      }.onCanceled {
+        downloads.remove(it)
+        download(videos, ++lastIndex)
+        firePropertyChange("UPDATE_PROGRESS", index)
+        if (index == videos.size - 1) {
+          lastIndex = 0
+          firePropertyChange("DOWNLOADING", false)
+        }
+      }.onFinished { downloadItem , _ ->
+        downloads.remove(downloadItem)
+        download(videos, ++lastIndex)
+        firePropertyChange("UPDATE_PROGRESS", index)
+        if (index == videos.size - 1) {
+          lastIndex = 0
+          firePropertyChange("DOWNLOADING", false)
+        }
+      }
+    downloadItem.download()
+
+    downloads.add(downloadItem)
+    download(videos, ++lastIndex)
+  }
+
+  private fun firePropertyChange(name: String, newValue: Any?) {
     SwingUtilities.invokeLater {
-      publisher.firePropertyChange(name, oldValue, newValue)
+      publisher.firePropertyChange(name, null, newValue)
     }
   }
 
