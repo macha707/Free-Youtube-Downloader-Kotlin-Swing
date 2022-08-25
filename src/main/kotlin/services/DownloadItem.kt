@@ -19,7 +19,7 @@ class DownloadItem(
 
   private var onProgress: (progress: Int) -> Unit = { }
   private var onFinished: (item: DownloadItem, data: File) -> Unit = { _, _ -> }
-  private var onCanceled: (item: DownloadItem) -> Unit = { }
+  private var onCanceled: (item: DownloadItem, canceled: Boolean) -> Unit = { _, _ -> }
 
   private var videoDownloadedSize = 0L
   private var audioDownloadedSize = 0L
@@ -42,7 +42,7 @@ class DownloadItem(
     videoResponse?.cancel()
     audioResponse?.cancel()
     videoItem.state = State.Canceling
-    onCanceled(this)
+    onCanceled(this, false)
 
     thread {
       while (videoFile.exists() || audioFile.exists()) {
@@ -50,7 +50,7 @@ class DownloadItem(
         if (audioFile.exists()) audioFile.delete()
       }
       videoItem.state = State.Canceled
-      onCanceled(this)
+      onCanceled(this, true)
     }
 
   }
@@ -166,7 +166,7 @@ class DownloadItem(
     return this
   }
 
-  fun onCanceled(onCanceled: (item: DownloadItem) -> Unit): DownloadItem {
+  fun onCanceled(onCanceled: (item: DownloadItem, canceled: Boolean) -> Unit): DownloadItem {
     this.onCanceled = onCanceled
     return this
   }

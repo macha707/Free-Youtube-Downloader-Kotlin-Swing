@@ -85,19 +85,21 @@ object Downloader {
     val downloadItem = DownloadItem(downloader, videos[index])
       .onProgress {
         firePropertyChange("UPDATE_PROGRESS", index)
-      }.onCanceled {
-        downloads.remove(it)
-        download(videos, ++lastIndex)
+      }.onCanceled { downloadItem, canceled ->
         firePropertyChange("UPDATE_PROGRESS", index)
-        if (index == videos.size - 1) {
+        if (canceled) {
+          downloads.remove(downloadItem)
+          download(videos, ++lastIndex)
+        }
+        if (downloads.isEmpty()) {
           lastIndex = 0
           firePropertyChange("DOWNLOADING", false)
         }
-      }.onFinished { downloadItem , _ ->
+      }.onFinished { downloadItem, _ ->
         downloads.remove(downloadItem)
         download(videos, ++lastIndex)
         firePropertyChange("UPDATE_PROGRESS", index)
-        if (index == videos.size - 1) {
+        if (downloads.isEmpty()) {
           lastIndex = 0
           firePropertyChange("DOWNLOADING", false)
         }
