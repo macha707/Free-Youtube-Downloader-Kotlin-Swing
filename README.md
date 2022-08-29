@@ -7,9 +7,9 @@ YouTube Video And Playlist Downloader Using Kotlin and swing
 ---
 ### How to use
 1. Download and install Java from **[Here](https://www.java.com/en/download/manual.jsp)**
-2. Download **[FreeYoutubeDownloader.zip](https://github.com/ahatem/Free-Youtube-Downloader-Kotlin-Swing/releases/download/v1.0.0/FreeYoutubeDownloader.zip)**
+2. Download **[FreeYoutubeDownloader.zip](https://github.com/ahatem/Free-Youtube-Downloader-Kotlin-Swing/releases/download/v2.0.0/FreeYoutubeDownloader.zip)**
    and unzip the file
-3. Open `FreeYoutubeDownloader.exe` and you are ready to go :smiley:
+3. Open `FreeYoutubeDownloader.jar` and you are ready to go :smiley:
 
 ---
 ### How to download `1080p, 2k` videos
