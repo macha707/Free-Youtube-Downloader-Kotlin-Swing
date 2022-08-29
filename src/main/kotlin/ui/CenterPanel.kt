@@ -1,50 +1,58 @@
 package ui
 
-import models.Quality
-import models.VideoItem
+import models.YoutubeItem
+import services.state.StateManager
 import ui.views.JYoutubeList
 import java.awt.BorderLayout
-import java.io.File
 import javax.swing.BorderFactory
 import javax.swing.JPanel
 
 class CenterPanel : JPanel() {
 
+  private var onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit = {}
+
   private val videosList = JYoutubeList()
 
-  val videos: List<VideoItem> get() = videosList.videos
-
-    init {
+  init {
     layout = BorderLayout()
     border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
 
-    videosList.addPropertyChangeListener {
-      if (it.propertyName == "VIDEO_QUALITY_CHANGED") {
-        firePropertyChange("UPDATE_TOTAL_DOWNLOAD_SIZE" , "" , videosList.totalSize())
-      } else if (it.propertyName == "CANCEL_VIDEO") {
-        firePropertyChange("CANCEL_VIDEO" , "" , it.newValue)
-      }
-    }
+    videosList.onVideoQualityChanged { youtubeVideo , quality -> StateManager.updateSelectedQuality(youtubeVideo , quality) }
+    videosList.onDownloadLocationChanged { youtubeVideo , location -> StateManager.updateDownloadLocation(youtubeVideo , location) }
+    videosList.onVideoNameChanged { youtubeVideo , name -> StateManager.updateVideoName(youtubeVideo , name) }
+    videosList.onVideoCancelClicked { onVideoCancelClicked.invoke(it) }
 
     add(videosList)
   }
 
-  fun addVideo(videoItem: VideoItem) {
-    videosList.addElement(videoItem)
-    firePropertyChange("UPDATE_TOTAL_DOWNLOAD_SIZE" , "" , videosList.totalSize())
-    firePropertyChange("UPDATE_AVAILABLE_QUALITIES" , "" , videosList.worstQualities())
+  fun addVideo(youtubeItem: YoutubeItem) {
+    videosList.addElement(youtubeItem)
   }
 
-  fun updateSelectedQuality(quality: Quality) {
-    videosList.updateSelectedQuality(quality)
+  fun updateSelectedQuality() {
+    videosList.updateSelectedQuality()
   }
 
-  fun updateDownloadLocation(downloadLocation: File) {
-    videosList.updateDownloadLocation(downloadLocation)
+  fun updateDownloadLocation() {
+    videosList.updateDownloadLocation()
   }
+
+  fun updateSelectedQuality(index: Int) {
+    videosList.updateSelectedQuality(index)
+  }
+
+  fun updateDownloadLocation(index: Int) {
+    videosList.updateDownloadLocation(index)
+  }
+
 
   fun updateItemState(index: Int) {
     videosList.updateItemState(index)
+  }
+
+
+  fun onVideoCancelClicked(onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit) {
+    this.onVideoCancelClicked = onVideoCancelClicked
   }
 
 }

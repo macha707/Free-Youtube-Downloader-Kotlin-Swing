@@ -1,8 +1,8 @@
 package ui
 
-import models.NewUrlRequest
 import models.Quality
 import models.UserPreferences
+import services.state.StateManager
 import utils.GBHelper
 import utils.chooseFolder
 import utils.placeholder
@@ -15,10 +15,14 @@ import javax.swing.*
 
 class NorthPanel(frame: JFrame) : JPanel() {
 
+
+  private var onAddClicked: (youtubeUrl: String) -> Unit = {}
+  private var onDownloadClicked: () -> Unit = {}
+
   private val tfYoutubeUrl: JTextField = JTextField()
   private val btnAddUrl: JButton = JButton("Add")
 
-  private val cbVideoQuality = JComboBox(arrayOf("No Qualities Available"))
+  private val cbVideoQuality = JComboBox<Any>(arrayOf("No Qualities Available"))
   private val tfDownloadSize = JTextField(0L.toReadableFileSize()).apply {
     isEditable = false
     horizontalAlignment = JTextField.CENTER
@@ -29,45 +33,34 @@ class NorthPanel(frame: JFrame) : JPanel() {
 
   private val btnDownload: JButton = JButton("Download")
 
-
   init {
     layout = GridBagLayout()
     border = BorderFactory.createCompoundBorder(
-      BorderFactory.createEmptyBorder(5, 5, 0, 5),
-      BorderFactory.createCompoundBorder(
-        BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor")),
-        BorderFactory.createEmptyBorder(5, 5, 5, 5)
+      BorderFactory.createEmptyBorder(5, 5, 0, 5), BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor")), BorderFactory.createEmptyBorder(5, 5, 5, 5)
       )
     )
     tfYoutubeUrl.placeholder = "Enter youtube Video/Playlist url"
 
-    btnAddUrl.addActionListener {
-      firePropertyChange("NEW_URL", "", NewUrlRequest(tfYoutubeUrl.text, File(tfDownloadLocation.text)))
-    }
+    btnAddUrl.addActionListener { onAddClicked.invoke(tfYoutubeUrl.text) }
 
     cbVideoQuality.addItemListener {
       if (it.stateChange == ItemEvent.SELECTED) {
         if (cbVideoQuality.selectedIndex > -1)
-          firePropertyChange(
-            "CHANGE_DOWNLOAD_QUALITY",
-            "",
-            Quality.of(cbVideoQuality.selectedItem?.toString().orEmpty()) ?: Quality.LOW
-          )
+          StateManager.updateSelectedQuality(cbVideoQuality.selectedItem as Quality)
       }
     }
 
     btnChooseLocation.addActionListener {
       val downloadLocation = chooseFolder(File(tfDownloadLocation.text))
       tfDownloadLocation.text = downloadLocation.absolutePath
-      firePropertyChange("CHANGE_DOWNLOAD_LOCATION", null, downloadLocation)
+      StateManager.updateDownloadLocation(downloadLocation)
     }
 
     btnDownload.apply {
       font = font.deriveFont(Font.BOLD)
       foreground = foreground.brighter()
-      addActionListener {
-        firePropertyChange("START_DOWNLOAD", "", tfDownloadLocation.text)
-      }
+      addActionListener { onDownloadClicked.invoke() }
     }
 
 
@@ -107,17 +100,21 @@ class NorthPanel(frame: JFrame) : JPanel() {
   }
 
   fun updateQualities(qualities: List<Quality>) {
-    if (qualities.size == cbVideoQuality.itemCount) return
-
     cbVideoQuality.removeAllItems()
-    qualities.forEach { cbVideoQuality.addItem(it.readableName) }
+    qualities.forEach { cbVideoQuality.addItem(it) }
     cbVideoQuality.selectedIndex = 0
-
   }
 
   fun updateDownloadSize(downloadSize: Long) {
     tfDownloadSize.text = downloadSize.toReadableFileSize()
   }
 
+  fun onAddClicked(onAddClicked: (youtubeUrl: String) -> Unit) {
+    this.onAddClicked = onAddClicked
+  }
+
+  fun onDownloadClicked(onDownloadClicked: () -> Unit) {
+    this.onDownloadClicked = onDownloadClicked
+  }
 
 }

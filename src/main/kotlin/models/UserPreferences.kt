@@ -1,5 +1,7 @@
 package models
 
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.util.prefs.Preferences
 
 object UserPreferences {
@@ -22,4 +24,20 @@ object UserPreferences {
       prefs.put(KEY_FFMPEG_PATH, value)
       field = value
     }
+
+  fun isFFmpegAvailable(): Boolean {
+    return (isFFmpegInstalledInSystem() || FFMPEG_PATH.isNotEmpty())
+  }
+
+  fun isFFmpegInstalledInSystem(): Boolean {
+    val processBuilder = ProcessBuilder().redirectErrorStream(true)
+    val ffmpegVersionProcess = processBuilder.command(*arrayOf("cmd.exe" , "/c" , "ffmpeg -version")).start()
+    ffmpegVersionProcess.waitFor()
+    val ffmpegReader = BufferedReader(InputStreamReader(ffmpegVersionProcess.inputStream))
+    val ffmpegLine = ffmpegReader.lineSequence().first()
+    val ffmpegVersion = Regex("ffmpeg version ([\\d.]+)").find(ffmpegLine)?.groupValues?.get(1)
+    ffmpegVersionProcess.destroy()
+    return ffmpegVersion != null
+  }
+
 }

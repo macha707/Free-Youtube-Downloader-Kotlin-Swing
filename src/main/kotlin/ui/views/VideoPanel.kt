@@ -2,30 +2,26 @@ package ui.views
 
 import models.Quality
 import models.State
-import models.VideoItem
-import utils.GBHelper
-import utils.chooseFolder
-import utils.toReadableFileSize
-import utils.loadUrl
+import models.YoutubeItem
+import utils.*
 import java.awt.*
 import java.io.File
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 
-class VideoPanel(private val videoItem: VideoItem, val index: Int = 0) : JPanel() {
+class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPanel() {
 
-  val availableQualities get() = videoItem.availableQualities
-  val downloadSize get() = videoItem.size
+  private var onDownloadLocationChange: VideoDownloadLocationChangeListener = { _, _ -> }
+  private var onVideoQualityChanged: VideoSelectedQualityChangeListener = { _, _ -> }
+  private var onVideoNameChanged: VideoNameChangeListener = { _, _ -> }
+  private var onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit = {}
 
-  private val tfVideoName = JTextField(videoItem.name, 15)
-  private val cbVideoQuality = JComboBox(videoItem.availableQualities.map { it.readableName }.toTypedArray())
-  private val tfVideoSize = JTextField(videoItem.size.toReadableFileSize()).apply {
-    isEditable = false
-    horizontalAlignment = JTextField.CENTER
-  }
+  private val tfVideoName = JTextField(youtubeItem.name, 15)
+  private val cbVideoQuality = JComboBox(youtubeItem.availableQualities.toTypedArray())
+  private val tfVideoSize = JTextField(youtubeItem.size.toReadableFileSize())
 
   private val lblLocation = JLabel("Location")
-  private val tfDownloadLocation = JTextField(videoItem.downloadTo.absolutePath, 15).apply { isEditable = false }
+  private val tfDownloadLocation = JTextField(youtubeItem.downloadTo.absolutePath, 15).apply { isEditable = false }
   private val savePathBtn = JButton("Choose")
 
   init {
@@ -43,38 +39,34 @@ class VideoPanel(private val videoItem: VideoItem, val index: Int = 0) : JPanel(
     add(getVideoOptionsPanel(), BorderLayout.CENTER)
   }
 
-  fun updateVideoQuality(quality: Quality) {
-    videoItem.downloadQuality = quality
-    cbVideoQuality.selectedItem = quality.readableName
-    tfVideoSize.text = videoItem.size.toReadableFileSize()
-    firePropertyChange("VIDEO_QUALITY_CHANGED", null, videoItem.size)
+  fun updateSelectedQuality() {
+    cbVideoQuality.selectedItem = youtubeItem.downloadQuality
+    tfVideoSize.text = youtubeItem.size.toReadableFileSize()
   }
 
-  fun updateDownloadLocation(downloadLocation: File) {
+  fun updateDownloadLocation() {
     JTextField().run {
       tfDownloadLocation.foreground = disabledTextColor
       tfDownloadLocation.font = font
     }
-
-    videoItem.downloadTo = downloadLocation
-    tfDownloadLocation.text = downloadLocation.absolutePath
+    tfDownloadLocation.text = youtubeItem.downloadTo.absolutePath
   }
 
   fun updateVideoUIState() {
     lblLocation.text = "Status"
-    tfDownloadLocation.text = videoItem.state.stateText
+    tfDownloadLocation.text = youtubeItem.state.stateText
     tfDownloadLocation.font = tfDownloadLocation.font.deriveFont(Font.BOLD)
-    tfDownloadLocation.foreground = when (videoItem.state) {
+    tfDownloadLocation.foreground = when (youtubeItem.state) {
       is State.Downloading -> Color.decode("#3498db")
       State.Completed -> Color.decode("#20CC82")
       State.Canceling -> Color.decode("#e85445")
       State.Canceled -> Color.decode("#e74c3c")
-      State.Merging -> Color.decode("#dbb434")
+      is State.CustomState -> Color.decode("#dbb434")
       State.Normal -> JTextField().disabledTextColor
     }
 
-    when (videoItem.state) {
-      is State.Downloading, State.Merging, State.Canceling -> {
+    when (youtubeItem.state) {
+      is State.Downloading, is State.CustomState, State.Canceling -> {
         tfVideoName.isEnabled = false
         cbVideoQuality.isEnabled = false
         tfVideoSize.isEnabled = false
@@ -88,14 +80,10 @@ class VideoPanel(private val videoItem: VideoItem, val index: Int = 0) : JPanel(
     }
   }
 
-  fun getVideoItem(): VideoItem {
-    return videoItem.apply { name = tfVideoName.text }
-  }
-
   private fun getThumbnailImage(): JLabel {
     val imgThumbnail = JLabel()
     imgThumbnail.border = EmptyBorder(3, 3, 3, 3)
-    imgThumbnail.icon = ImageIcon().run { loadUrl(videoItem.thumbnailUrl, 88); this }
+    imgThumbnail.icon = ImageIcon().run { loadUrl(youtubeItem.thumbnailUrl, 88); this }
     return imgThumbnail
   }
 
@@ -104,7 +92,6 @@ class VideoPanel(private val videoItem: VideoItem, val index: Int = 0) : JPanel(
     videoOptionsPanel.layout = GridBagLayout()
     videoOptionsPanel.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
     videoOptionsPanel.background = null
-
 
     val sharedPos = GBHelper()
     downloadOptionsPanel(videoOptionsPanel, sharedPos)
@@ -115,9 +102,15 @@ class VideoPanel(private val videoItem: VideoItem, val index: Int = 0) : JPanel(
 
   private fun downloadOptionsPanel(videoOptionsPanel: JPanel, pos: GBHelper) {
 
+    tfVideoName.addTextChangeListener { onVideoNameChanged.invoke(youtubeItem , tfVideoName.text) }
+
     cbVideoQuality.addActionListener {
-      updateVideoQuality(Quality.of(cbVideoQuality.selectedItem?.toString().orEmpty()) ?: Quality.LOW)
+      val quality = cbVideoQuality.selectedItem as Quality
+      onVideoQualityChanged.invoke(youtubeItem, quality)
     }
+
+    tfVideoSize.isEditable = false
+    tfVideoSize.horizontalAlignment = JTextField.CENTER
 
     videoOptionsPanel.add(JLabel("Name"), pos.padding(right = 5))
     videoOptionsPanel.add(tfVideoName, pos.nextCol().width(2).fill(GridBagConstraints.HORIZONTAL).expandW())
@@ -130,13 +123,32 @@ class VideoPanel(private val videoItem: VideoItem, val index: Int = 0) : JPanel(
 
   private fun downloadLocationPanel(videoOptionsPanel: JPanel, pos: GBHelper) {
     savePathBtn.addActionListener {
-      if (savePathBtn.text == "Choose") updateDownloadLocation(chooseFolder(File(tfDownloadLocation.text)))
-      else firePropertyChange("CANCEL_VIDEO", null, videoItem)
+      if (savePathBtn.text == "Choose") {
+        val location = chooseFolder(File(tfDownloadLocation.text))
+        onDownloadLocationChange.invoke(youtubeItem, location)
+      }
+      else onVideoCancelClicked.invoke(youtubeItem)
     }
 
     videoOptionsPanel.add(lblLocation, pos.nextRow().padding(right = 5).align(GridBagConstraints.WEST))
     videoOptionsPanel.add(tfDownloadLocation, pos.nextCol().expandW())
     videoOptionsPanel.add(savePathBtn, pos.nextCol().align(GridBagConstraints.CENTER))
+  }
+
+  fun onVideoCancelClicked(onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit) {
+    this.onVideoCancelClicked = onVideoCancelClicked
+  }
+
+  fun onVideoQualityChanged(videoSelectedQualityChangeListener: VideoSelectedQualityChangeListener) {
+    this.onVideoQualityChanged = videoSelectedQualityChangeListener
+  }
+
+  fun onDownloadLocationChange(videoDownloadLocationChangeListener: VideoDownloadLocationChangeListener) {
+    this.onDownloadLocationChange = videoDownloadLocationChangeListener
+  }
+
+  fun onVideoNameChanged(videoNameChangeListener: VideoNameChangeListener) {
+    this.onVideoNameChanged = videoNameChangeListener
   }
 
 }

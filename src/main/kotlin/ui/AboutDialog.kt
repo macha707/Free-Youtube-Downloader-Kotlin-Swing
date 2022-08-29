@@ -7,9 +7,9 @@ import javax.swing.*
 class AboutDialog(owner: JFrame) : JDialog(owner, "About", true) {
 
   init {
-
     layout = BorderLayout()
     defaultCloseOperation = DISPOSE_ON_CLOSE
+    isResizable = false
 
     val mainPanel = JPanel()
     mainPanel.layout = BorderLayout()

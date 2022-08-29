@@ -2,15 +2,13 @@ package ui
 
 import models.UserPreferences
 import utils.GBHelper
-import java.awt.BorderLayout
-import java.awt.GridBagConstraints
-import java.awt.GridBagLayout
+import java.awt.*
+import java.io.File
 import javax.swing.*
-import javax.swing.filechooser.FileNameExtensionFilter
+import javax.swing.filechooser.FileFilter
 
 
 class PreferencesDialog(owner: JFrame) : JDialog(owner, "User Preferences", true) {
-
 
   private val spinnerParallelDownloads = JSpinner(SpinnerNumberModel(UserPreferences.MAX_PARALLEL_DOWNLOADS, 1, 10, 1))
   private val fldFFmpegLocaiton = JTextField(UserPreferences.FFMPEG_PATH, 20)
@@ -41,9 +39,25 @@ class PreferencesDialog(owner: JFrame) : JDialog(owner, "User Preferences", true
     preferencesPanel.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
     preferencesPanel.layout = GridBagLayout()
 
+
+    if (UserPreferences.isFFmpegInstalledInSystem()) {
+      btnChooseFFmpegLocation.isEnabled = false
+      fldFFmpegLocaiton.isEnabled = false
+      fldFFmpegLocaiton.text = "FFMPEG Detected On The System"
+      fldFFmpegLocaiton.disabledTextColor = Color.decode("#20CC82")
+    }
+
     btnChooseFFmpegLocation.addActionListener {
       val chooser = JFileChooser()
-      chooser.fileFilter = FileNameExtensionFilter("Allowed", "exe")
+      chooser.fileFilter = object : FileFilter() {
+        override fun accept(file: File?): Boolean {
+          file ?: return false
+          return file.name.startsWith("ffmpeg") || file.isDirectory
+        }
+        override fun getDescription(): String {
+          return "ffmpeg"
+        }
+      }
       val returnVal = chooser.showOpenDialog(parent)
       if (returnVal == JFileChooser.APPROVE_OPTION && chooser.selectedFile != null) {
         fldFFmpegLocaiton.text = chooser.selectedFile.absolutePath

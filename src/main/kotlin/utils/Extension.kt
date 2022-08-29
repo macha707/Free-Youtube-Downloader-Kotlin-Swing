@@ -12,6 +12,8 @@ import java.text.StringCharacterIterator
 import java.util.*
 import javax.imageio.ImageIO
 import javax.swing.*
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
 
 fun getSpeedText(startTime: Long, downloadedSize: Long): String {
@@ -49,10 +51,31 @@ fun Long.toReadableFileSize(): String {
   return String.format("%.1f %cB", value / 1024.0, ci.current())
 }
 
+fun String.asGoodFileName(): String {
+  return this.replace(Regex("[#%&{}<>*?$!'/\\\\\":@+`|=]"), " ")
+    .replace("\\s+".toRegex(), " ")
+}
 
 var JTextField.placeholder: String
   get() = this.getClientProperty("JTextField.placeholderText")?.toString() ?: ""
   set(value) = this.putClientProperty("JTextField.placeholderText", value)
+
+
+fun JTextField.addTextChangeListener(listener: (event: DocumentEvent?) -> Unit) {
+  this.document.addDocumentListener(object : DocumentListener {
+    override fun insertUpdate(e: DocumentEvent?) {
+      listener(e)
+    }
+
+    override fun removeUpdate(e: DocumentEvent?) {
+      listener(e)
+    }
+
+    override fun changedUpdate(e: DocumentEvent?) {
+      listener(e)
+    }
+  })
+}
 
 fun ImageIcon.loadUrl(url: String, height: Int) {
   image = try {

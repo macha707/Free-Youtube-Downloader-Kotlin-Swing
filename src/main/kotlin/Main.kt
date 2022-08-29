@@ -1,9 +1,8 @@
 import com.formdev.flatlaf.FlatDarculaLaf
 import com.github.kiulian.downloader.YoutubeDownloader
-import com.github.kiulian.downloader.downloader.request.RequestVideoInfo
-import com.github.kiulian.downloader.model.Extension
-import models.*
-import services.Downloader
+import services.downloader.DefaultYoutubeDownloader
+import services.parser.YoutubeParser
+import services.state.StateManager
 import ui.AboutDialog
 import ui.CenterPanel
 import ui.NorthPanel
@@ -12,28 +11,27 @@ import utils.Constants
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Toolkit
-import java.io.File
 import javax.swing.*
 
+class MainFrame : JFrame("Free Youtube Downloader") {
+  val northLayout: NorthPanel
+  val centerLayout: CenterPanel
 
-fun main() {
-  FlatDarculaLaf.setup()
-
-  val frame = JFrame("Free Youtube Downloader").apply frame@ {
+  init {
     defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
     minimumSize = Dimension(500, 450)
-    preferredSize = Dimension(600, 550)
+    preferredSize = Dimension(500, 550)
     jMenuBar = JMenuBar().apply {
       add(JMenu("Help").apply {
         add(JMenuItem("Preferences").apply {
           addActionListener {
-            PreferencesDialog(this@frame).isVisible = true
+            PreferencesDialog(this@MainFrame).isVisible = true
           }
         })
         add(JSeparator())
         add(JMenuItem("About").apply {
           addActionListener {
-            AboutDialog(this@frame).isVisible = true
+            AboutDialog(this@MainFrame).isVisible = true
           }
         })
       })
@@ -41,85 +39,58 @@ fun main() {
     iconImages = arrayOf("16", "24", "32", "48", "64", "72", "96", "128").map {
       Toolkit.getDefaultToolkit().getImage(Constants.javaClass.classLoader.getResource("icons/icon${it}.png"))
     }
+
+    northLayout = NorthPanel(this)
+    centerLayout = CenterPanel()
+
+    add(northLayout, BorderLayout.NORTH)
+    add(centerLayout, BorderLayout.CENTER)
+
+    pack()
+    setLocationRelativeTo(null)
+    isVisible = true
+
   }
 
-  val northLayout = NorthPanel(frame)
-  val centerLayout = CenterPanel()
+}
 
-  Downloader.subscribe {
-    when (it.propertyName) {
-      "VIDEO_ADDED" -> {
-        centerLayout.addVideo(it.newValue as VideoItem)
-      }
+fun main() {
+  FlatDarculaLaf.setup()
 
-      "NEW_PLAYLIST" -> {
-        val data = it.newValue as NewPlaylistResponse
-        northLayout.disable(data.isParsing)
-      }
+  val youtubeDownloader = YoutubeDownloader()
+  val parser = YoutubeParser(youtubeDownloader)
+  val defaultYoutubeDownloader = DefaultYoutubeDownloader(youtubeDownloader)
 
-      "NEW_VIDEO" -> {
-        val isParsing = it.newValue as Boolean
-        northLayout.disable(isParsing)
-      }
+  SwingUtilities.invokeLater {
+    val frame = MainFrame()
 
-      "UPDATE_PROGRESS" -> {
-        centerLayout.updateItemState(it.newValue as Int)
-      }
+    StateManager.onVideoAdded { frame.centerLayout.addVideo(it) }
+    StateManager.onTotalDownloadSizeChange { frame.northLayout.updateDownloadSize(it) }
+    StateManager.onAvailableQualitiesChange { frame.northLayout.updateQualities(it) }
 
-      "DOWNLOADING" -> {
-        val isDownloading = it.newValue as Boolean
-        northLayout.disable(isDownloading)
-      }
-    }
-  }
-  northLayout.addPropertyChangeListener {
-    when (it.propertyName) {
-      "NEW_URL" -> {
-        Downloader.parse(it.newValue as NewUrlRequest)
-      }
+    StateManager.onSelectedQualityChange { frame.centerLayout.updateSelectedQuality() }
+    StateManager.onDownloadLocationChange { frame.centerLayout.updateDownloadLocation() }
 
-      "CHANGE_DOWNLOAD_LOCATION" -> {
-        centerLayout.updateDownloadLocation(it.newValue as File)
-      }
+    StateManager.onVideoQualityChange { frame.centerLayout.updateSelectedQuality(it) }
+    StateManager.onVideoDownloadLocationChange { frame.centerLayout.updateDownloadLocation(it) }
+    StateManager.onVideoStateChanged { frame.centerLayout.updateItemState(it) }
 
-      "CHANGE_DOWNLOAD_QUALITY" -> {
-        centerLayout.updateSelectedQuality(it.newValue as Quality)
-      }
+    parser.onParsing { isParsing -> frame.northLayout.disable(isParsing) }
+    parser.onNewVideo { StateManager.addVideo(it) }
 
-      "START_DOWNLOAD" -> {
-        Downloader.startDownload(centerLayout.videos)
-      }
-    }
-  }
-  centerLayout.addPropertyChangeListener {
-    when (it.propertyName) {
-      "UPDATE_TOTAL_DOWNLOAD_SIZE" -> {
-        northLayout.updateDownloadSize(it.newValue as Long)
-      }
+    defaultYoutubeDownloader.onDownloading { isDownloading -> frame.northLayout.disable(isDownloading) }
+    defaultYoutubeDownloader.onProgressUpdated { frame.centerLayout.updateItemState(it) }
 
-      "UPDATE_AVAILABLE_QUALITIES" -> {
-        northLayout.updateQualities(it.newValue as List<Quality>)
-      }
-
-      "CANCEL_VIDEO" -> {
-        Downloader.cancelVideoDownload(it.newValue as VideoItem)
-      }
-    }
+    frame.northLayout.onAddClicked { youtubeUrl -> parser.smartParseAsync(youtubeUrl) }
+    frame.northLayout.onDownloadClicked { defaultYoutubeDownloader.startDownload(StateManager.videos) }
+    frame.centerLayout.onVideoCancelClicked { defaultYoutubeDownloader.cancelDownload(it) }
   }
 
-  frame.add(northLayout, BorderLayout.NORTH)
-  frame.add(centerLayout, BorderLayout.CENTER)
-
-  frame.pack()
-  frame.setLocationRelativeTo(null)
-  frame.isVisible = true
-
-//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=mkggXE5e2yk", File(UserPreferences.DOWNLOADS_FOLDER)))
-//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=LXb3EKWsInQ", File(UserPreferences.DOWNLOADS_FOLDER)))
-//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=2Xmibe4YhpQ", File(UserPreferences.DOWNLOADS_FOLDER)))
-//  Downloader.parse(NewUrlRequest("https://www.youtube.com/watch?v=1La4QzGeaaQ", File(UserPreferences.DOWNLOADS_FOLDER)))
-
-//  NOT WORKING: https://www.youtube.com/watch?v=reYPUvu2Giw&ab_channel=RandomCoder
+//  parser.smartParse("https://www.youtube.com/watch?v=mkggXE5e2yk")
+//  parser.smartParse("https://www.youtube.com/watch?v=LXb3EKWsInQ")
+//  parser.smartParse("https://www.youtube.com/watch?v=2Xmibe4YhpQ")
+//  parser.smartParse("https://www.youtube.com/watch?v=1La4QzGeaaQ")
+//  parser.smartParse("https://www.youtube.com/playlist?list=PL0vfts4VzfNiP4xgrtnSUbK99iXLINc9m")
 
 }
 
