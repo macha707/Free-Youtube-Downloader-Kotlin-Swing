@@ -1,4 +1,4 @@
-import com.formdev.flatlaf.FlatDarculaLaf
+import com.formdev.flatlaf.intellijthemes.FlatOneDarkIJTheme
 import com.github.kiulian.downloader.YoutubeDownloader
 import services.downloader.DefaultYoutubeDownloader
 import services.parser.YoutubeParser
@@ -49,13 +49,12 @@ class MainFrame : JFrame("Free Youtube Downloader") {
     pack()
     setLocationRelativeTo(null)
     isVisible = true
-
   }
-
 }
 
 fun main() {
-  FlatDarculaLaf.setup()
+  FlatOneDarkIJTheme.setup()
+  UIManager.put("TitlePane.unifiedBackground", false)
 
   val youtubeDownloader = YoutubeDownloader()
   val parser = YoutubeParser(youtubeDownloader)
@@ -86,11 +85,10 @@ fun main() {
     frame.centerLayout.onVideoCancelClicked { defaultYoutubeDownloader.cancelDownload(it) }
   }
 
-//  parser.smartParse("https://www.youtube.com/watch?v=mkggXE5e2yk")
-//  parser.smartParse("https://www.youtube.com/watch?v=LXb3EKWsInQ")
-//  parser.smartParse("https://www.youtube.com/watch?v=2Xmibe4YhpQ")
-//  parser.smartParse("https://www.youtube.com/watch?v=1La4QzGeaaQ")
-//  parser.smartParse("https://www.youtube.com/playlist?list=PL0vfts4VzfNiP4xgrtnSUbK99iXLINc9m")
-
+  parser.smartParse("https://www.youtube.com/watch?v=mkggXE5e2yk")
+  parser.smartParse("https://www.youtube.com/watch?v=LXb3EKWsInQ")
+  parser.smartParse("https://www.youtube.com/watch?v=2Xmibe4YhpQ")
+  parser.smartParse("https://www.youtube.com/watch?v=1La4QzGeaaQ")
+  parser.smartParse("https://www.youtube.com/playlist?list=PL0vfts4VzfNiP4xgrtnSUbK99iXLINc9m")
 }
 

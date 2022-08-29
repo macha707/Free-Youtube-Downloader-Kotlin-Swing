@@ -15,7 +15,6 @@ import javax.swing.*
 
 class NorthPanel(frame: JFrame) : JPanel() {
 
-
   private var onAddClicked: (youtubeUrl: String) -> Unit = {}
   private var onDownloadClicked: () -> Unit = {}
 
@@ -23,10 +22,7 @@ class NorthPanel(frame: JFrame) : JPanel() {
   private val btnAddUrl: JButton = JButton("Add")
 
   private val cbVideoQuality = JComboBox<Any>(arrayOf("No Qualities Available"))
-  private val tfDownloadSize = JTextField(0L.toReadableFileSize()).apply {
-    isEditable = false
-    horizontalAlignment = JTextField.CENTER
-  }
+  private val tfDownloadSize = JTextField(0L.toReadableFileSize())
 
   private val tfDownloadLocation: JTextField = JTextField(UserPreferences.DOWNLOADS_FOLDER).apply { isEditable = false }
   private val btnChooseLocation = JButton("Choose")
@@ -41,6 +37,9 @@ class NorthPanel(frame: JFrame) : JPanel() {
       )
     )
     tfYoutubeUrl.placeholder = "Enter youtube Video/Playlist url"
+
+    tfDownloadSize.isEditable = false
+    tfDownloadSize.horizontalAlignment = JTextField.CENTER
 
     btnAddUrl.addActionListener { onAddClicked.invoke(tfYoutubeUrl.text) }
 

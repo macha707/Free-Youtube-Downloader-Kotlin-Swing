@@ -2,7 +2,10 @@ package ui
 
 import models.UserPreferences
 import utils.GBHelper
-import java.awt.*
+import java.awt.BorderLayout
+import java.awt.Color
+import java.awt.GridBagConstraints
+import java.awt.GridBagLayout
 import java.io.File
 import javax.swing.*
 import javax.swing.filechooser.FileFilter
