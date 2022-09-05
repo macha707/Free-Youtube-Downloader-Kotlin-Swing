@@ -51,11 +51,12 @@ interface VideoHandler<I, O> {
 }
 
 class YoutubeVideoMerger : VideoHandler<YoutubeVideoMerger.VideoMergerRequest, File> {
-  data class VideoMergerRequest(val outputFileName: String , val videoFile: File ,val audioFile: File)
+  data class VideoMergerRequest(val outputFileName: String, val videoFile: File, val audioFile: File)
+
   override fun handle(input: VideoMergerRequest): File {
     val mergedFile = File(input.videoFile.parent, "${input.outputFileName}.mp4")
     val exeCmd = arrayOf(
-      File(UserPreferences.FFMPEG_PATH).absolutePath, "-i",
+      File(UserPreferences.FFMPEG_PATH).absolutePath, "-y", "-i",
       input.videoFile.absolutePath, "-i", input.audioFile.absolutePath,
       "-acodec", "copy", "-vcodec", "copy",
       mergedFile.absolutePath

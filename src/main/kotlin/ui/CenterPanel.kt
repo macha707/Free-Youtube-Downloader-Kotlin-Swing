@@ -10,6 +10,7 @@ import javax.swing.JPanel
 class CenterPanel : JPanel() {
 
   private var onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit = {}
+  private var onVideoRetryClicked: (youtubeItem: YoutubeItem) -> Unit = {}
 
   private val videosList = JYoutubeList()
 
@@ -21,6 +22,7 @@ class CenterPanel : JPanel() {
     videosList.onDownloadLocationChanged { youtubeVideo , location -> StateManager.updateDownloadLocation(youtubeVideo , location) }
     videosList.onVideoNameChanged { youtubeVideo , name -> StateManager.updateVideoName(youtubeVideo , name) }
     videosList.onVideoCancelClicked { onVideoCancelClicked.invoke(it) }
+    videosList.onVideoRetryClicked { onVideoRetryClicked.invoke(it) }
 
     add(videosList)
   }
@@ -45,14 +47,16 @@ class CenterPanel : JPanel() {
     videosList.updateDownloadLocation(index)
   }
 
-
   fun updateItemState(index: Int) {
     videosList.updateItemState(index)
   }
 
-
   fun onVideoCancelClicked(onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit) {
     this.onVideoCancelClicked = onVideoCancelClicked
+  }
+
+  fun onVideoRetryClicked(onVideoRetryClicked: (youtubeItem: YoutubeItem) -> Unit) {
+    this.onVideoRetryClicked = onVideoRetryClicked
   }
 
 }

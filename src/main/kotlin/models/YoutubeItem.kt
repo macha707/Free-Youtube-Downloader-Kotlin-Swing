@@ -71,8 +71,7 @@ data class YoutubeVideoWithAudio(val videoInfo: VideoInfo) : YoutubeItem(videoIn
 }
 
 
-
-class Quality (val format: Format) {
+class Quality(val format: Format) {
 
   enum class QualityLabel(val itags: List<Int> = emptyList(), val readableName: String) {
 
@@ -120,14 +119,13 @@ sealed class State(val stateText: String) {
   object Normal : State("")
   object Canceling : State("Canceling")
   object Canceled : State("Canceled")
-
-  data class Downloading(val progress: Int = 0) : State("Downloading ${progress}%")
-  data class CustomState(val text: String) : State(text)
   object Completed : State("Completed")
+  data class Downloading(val progress: Int = 0) : State("Downloading ${progress}%")
+  data class Error(val errorMessage: String = "Error") : State(errorMessage)
+  data class CustomState(val text: String) : State(text)
 }
 
 object YoutubeItemFactory {
-
   fun createYoutubeItem(videoInfo: VideoInfo): YoutubeItem {
     if (!UserPreferences.isFFmpegAvailable()) return YoutubeVideo(videoInfo)
 

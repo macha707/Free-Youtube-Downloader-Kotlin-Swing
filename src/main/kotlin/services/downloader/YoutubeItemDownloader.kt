@@ -17,6 +17,7 @@ abstract class AbstractYoutubeItemDownloader(val youtubeItem: YoutubeItem) {
 
   protected var onProgress: (progress: Int) -> Unit = { }
   protected var onFinished: (data: File) -> Unit = { }
+  protected var onError: (errorMessage: String) -> Unit = { }
   protected var onCanceled: (canceled: Boolean) -> Unit = { }
   protected var onCustomState: (state: State.CustomState) -> Unit = { }
 
@@ -28,6 +29,10 @@ abstract class AbstractYoutubeItemDownloader(val youtubeItem: YoutubeItem) {
 
   fun onFinished(onFinished: (data: File) -> Unit) {
     this.onFinished = onFinished
+  }
+
+  fun onError(onError: (errorMessage: String) -> Unit = { }) {
+    this.onError = onError
   }
 
   fun onCanceled(onCanceled: (canceled: Boolean) -> Unit) {
@@ -48,9 +53,9 @@ open class YoutubeVideoDownloader(
   youtubeVideo: YoutubeVideo,
 ) : AbstractYoutubeItemDownloader(youtubeVideo) {
 
+  private lateinit var videoFile: File
   private var videoDownloadedSize = 0L
   private var isVideoDownloaded = false
-  private lateinit var videoFile: File
   private var videoResponse: Response<File>? = null
 
   override fun download() {
@@ -61,13 +66,12 @@ open class YoutubeVideoDownloader(
     videoResponse?.cancel()
     onCanceled(false)
     thread {
-      while (videoFile.exists()) if (videoFile.exists()) videoFile.delete()
+      deleteDownloadedFiles()
       onCanceled(true)
     }
   }
 
   private fun downloadVideo() {
-    println("Downloading: ${youtubeItem.name} with ${youtubeItem.downloadQuality}")
     val videoDownloadRequest = RequestVideoFileDownload(youtubeItem.downloadQuality.format)
       .saveTo(youtubeItem.downloadTo)
       .renameTo(youtubeItem.name + " - Video")
@@ -80,6 +84,8 @@ open class YoutubeVideoDownloader(
         }
 
         override fun onError(throwable: Throwable?) {
+          onError.invoke(throwable?.message ?: "Unknown Error Occurred")
+          thread { deleteDownloadedFiles() }
         }
 
         override fun onDownloading(progress: Int) {
@@ -102,6 +108,10 @@ open class YoutubeVideoDownloader(
       onFinished(videoFile)
     }
   }
+
+  private fun deleteDownloadedFiles() {
+    while (videoFile.exists()) if (videoFile.exists()) videoFile.delete()
+  }
 }
 
 class YoutubeVideoWithAudioDownloader(
@@ -109,14 +119,14 @@ class YoutubeVideoWithAudioDownloader(
   youtubeVideoWithAudio: YoutubeVideoWithAudio
 ) : AbstractYoutubeItemDownloader(youtubeVideoWithAudio) {
 
+  private lateinit var videoFile: File
   private var videoDownloadedSize = 0L
   private var isVideoDownloaded = false
-  private lateinit var videoFile: File
   private var videoResponse: Response<File>? = null
 
+  private lateinit var audioFile: File
   private var audioDownloadedSize = 0L
   private var isAudioDownload = false
-  private lateinit var audioFile: File
   private var audioResponse: Response<File>? = null
 
   override fun download() {
@@ -129,16 +139,12 @@ class YoutubeVideoWithAudioDownloader(
     audioResponse?.cancel()
     onCanceled(false)
     thread {
-      while (videoFile.exists() || audioFile.exists()) {
-        if (videoFile.exists()) videoFile.delete()
-        if (audioFile.exists()) audioFile.delete()
-      }
+      deleteDownloadedFiles()
       onCanceled(true)
     }
   }
 
   private fun downloadVideo() {
-    println("Downloading: ${youtubeItem.name} with ${youtubeItem.downloadQuality}")
     val videoDownloadRequest = RequestVideoFileDownload(youtubeItem.downloadQuality.format)
       .saveTo(youtubeItem.downloadTo)
       .renameTo(youtubeItem.name + " - Video")
@@ -151,6 +157,8 @@ class YoutubeVideoWithAudioDownloader(
         }
 
         override fun onError(throwable: Throwable?) {
+          onError.invoke(throwable?.message ?: "Unknown Error Occurred")
+          thread { deleteDownloadedFiles() }
         }
 
         override fun onDownloading(progress: Int) {
@@ -197,12 +205,22 @@ class YoutubeVideoWithAudioDownloader(
 
   private fun downloadFinished() {
     if (isAudioDownload && isVideoDownloaded) {
+
+      // NOTE: Sometimes error happens when merging the video with the audio (Unhandled Error)
       val mergedFile = promise.then {
         onCustomState(State.CustomState("Merging"))
         val mergerRequest = YoutubeVideoMerger.VideoMergerRequest(youtubeItem.name, videoFile, audioFile)
         YoutubeVideoMerger().handle(mergerRequest)
       }.get()
+
       onFinished(mergedFile)
+    }
+  }
+
+  private fun deleteDownloadedFiles() {
+    while (videoFile.exists() || audioFile.exists()) {
+      if (videoFile.exists()) videoFile.delete()
+      if (audioFile.exists()) audioFile.delete()
     }
   }
 

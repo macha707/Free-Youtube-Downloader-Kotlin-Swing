@@ -76,6 +76,7 @@ fun main() {
 
     parser.onParsing { isParsing -> frame.northLayout.disable(isParsing) }
     parser.onNewVideo { StateManager.addVideo(it) }
+    parser.onError { println(it.message) /* TODO: create status-bar with mini-notifications system  */ }
 
     defaultYoutubeDownloader.onDownloading { isDownloading -> frame.northLayout.disable(isDownloading) }
     defaultYoutubeDownloader.onProgressUpdated { frame.centerLayout.updateItemState(it) }
@@ -83,12 +84,14 @@ fun main() {
     frame.northLayout.onAddClicked { youtubeUrl -> parser.smartParseAsync(youtubeUrl) }
     frame.northLayout.onDownloadClicked { defaultYoutubeDownloader.startDownload(StateManager.videos) }
     frame.centerLayout.onVideoCancelClicked { defaultYoutubeDownloader.cancelDownload(it) }
+    frame.centerLayout.onVideoRetryClicked { defaultYoutubeDownloader.retryDownload(it) }
   }
 
-  parser.smartParse("https://www.youtube.com/watch?v=mkggXE5e2yk")
-  parser.smartParse("https://www.youtube.com/watch?v=LXb3EKWsInQ")
-  parser.smartParse("https://www.youtube.com/watch?v=2Xmibe4YhpQ")
-  parser.smartParse("https://www.youtube.com/watch?v=1La4QzGeaaQ")
-  parser.smartParse("https://www.youtube.com/playlist?list=PL0vfts4VzfNiP4xgrtnSUbK99iXLINc9m")
+//  parser.smartParse("https://www.youtube.com/watch?v=mkggXE5e2yk")
+//  parser.smartParse("https://www.youtube.com/watch?v=LXb3EKWsInQ")
+//  parser.smartParse("https://www.youtube.com/watch?v=2Xmibe4YhpQ")
+//  parser.smartParse("https://www.youtube.com/watch?v=1La4QzGeaaQ")
+//  parser.smartParse("https://www.youtube.com/watch?v=8jLOx1hD3_o")
+//  parser.smartParse("https://www.youtube.com/playlist?list=PL0vfts4VzfNiP4xgrtnSUbK99iXLINc9m")
 }
 

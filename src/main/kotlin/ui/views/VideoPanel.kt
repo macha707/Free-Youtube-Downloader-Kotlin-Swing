@@ -15,6 +15,7 @@ class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPa
   private var onVideoQualityChanged: VideoSelectedQualityChangeListener = { _, _ -> }
   private var onVideoNameChanged: VideoNameChangeListener = { _, _ -> }
   private var onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit = {}
+  private var onVideoRetryClicked: (youtubeItem: YoutubeItem) -> Unit = {}
 
   private val tfVideoName = JTextField(youtubeItem.name, 15)
   private val cbVideoQuality = JComboBox(youtubeItem.availableQualities.toTypedArray())
@@ -32,8 +33,6 @@ class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPa
         BorderFactory.createMatteBorder(1, 0, 0, 0, UIManager.getColor("Component.borderColor")),
         border
       )
-
-    if (index % 2 != 0) background = background.darker()
 
     add(getThumbnailImage(), BorderLayout.WEST)
     add(getVideoOptionsPanel(), BorderLayout.CENTER)
@@ -60,7 +59,7 @@ class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPa
       is State.Downloading -> Color.decode("#3498db")
       State.Completed -> Color.decode("#20CC82")
       State.Canceling -> Color.decode("#e85445")
-      State.Canceled -> Color.decode("#e74c3c")
+      State.Canceled, is State.Error -> Color.decode("#e74c3c")
       is State.CustomState -> Color.decode("#dbb434")
       State.Normal -> JTextField().disabledTextColor
     }
@@ -73,8 +72,18 @@ class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPa
         savePathBtn.text = "Cancel"
       }
 
-      State.Canceled, State.Completed, State.Normal -> {
+      State.Completed, State.Normal -> {
+        tfVideoName.isEnabled = true
+        cbVideoQuality.isEnabled = true
+        tfVideoSize.isEnabled = true
         savePathBtn.text = "Choose"
+      }
+
+      is State.Error , State.Canceled -> {
+        tfVideoName.isEnabled = true
+        cbVideoQuality.isEnabled = true
+        tfVideoSize.isEnabled = true
+        savePathBtn.text = "Retry"
       }
 
     }
@@ -102,7 +111,7 @@ class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPa
 
   private fun downloadOptionsPanel(videoOptionsPanel: JPanel, pos: GBHelper) {
 
-    tfVideoName.addTextChangeListener { onVideoNameChanged.invoke(youtubeItem , tfVideoName.text) }
+    tfVideoName.addTextChangeListener { onVideoNameChanged.invoke(youtubeItem, tfVideoName.text) }
 
     cbVideoQuality.addActionListener {
       val quality = cbVideoQuality.selectedItem as Quality
@@ -123,11 +132,20 @@ class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPa
 
   private fun downloadLocationPanel(videoOptionsPanel: JPanel, pos: GBHelper) {
     savePathBtn.addActionListener {
-      if (savePathBtn.text == "Choose") {
-        val location = chooseFolder(File(tfDownloadLocation.text))
-        onDownloadLocationChange.invoke(youtubeItem, location)
+      when (savePathBtn.text) {
+        "Choose" -> {
+          val location = chooseFolder(File(tfDownloadLocation.text))
+          onDownloadLocationChange.invoke(youtubeItem, location)
+        }
+
+        "Cancel" -> {
+          onVideoCancelClicked.invoke(youtubeItem)
+        }
+
+        "Retry" -> {
+          onVideoRetryClicked.invoke(youtubeItem)
+        }
       }
-      else onVideoCancelClicked.invoke(youtubeItem)
     }
 
     videoOptionsPanel.add(lblLocation, pos.nextRow().padding(right = 5).align(GridBagConstraints.WEST))
@@ -149,6 +167,10 @@ class VideoPanel(private val youtubeItem: YoutubeItem, val index: Int = 0) : JPa
 
   fun onVideoNameChanged(videoNameChangeListener: VideoNameChangeListener) {
     this.onVideoNameChanged = videoNameChangeListener
+  }
+
+  fun onVideoRetryClicked(onVideoRetryClicked: (youtubeItem: YoutubeItem) -> Unit) {
+    this.onVideoRetryClicked = onVideoRetryClicked
   }
 
 }

@@ -18,6 +18,7 @@ class JYoutubeList : JPanel() {
   private var onDownloadLocationChanged: VideoDownloadLocationChangeListener = { _, _ -> }
   private var onVideoQualityChanged: VideoSelectedQualityChangeListener = { _, _ -> }
   private var onVideoCancelClicked: (youtubeItem: YoutubeItem) -> Unit = {}
+  private var onVideoRetryClicked: (youtubeItem: YoutubeItem) -> Unit = {}
   private var onVideoNameChanged: VideoNameChangeListener = { _, _ -> }
 
   private val items = ArrayList<VideoPanel>()
@@ -46,6 +47,7 @@ class JYoutubeList : JPanel() {
     videoPanel.onVideoQualityChanged(onVideoQualityChanged)
     videoPanel.onDownloadLocationChange(onDownloadLocationChanged)
     videoPanel.onVideoCancelClicked(onVideoCancelClicked)
+    videoPanel.onVideoRetryClicked(onVideoRetryClicked)
 
     items.add(videoPanel)
 
@@ -90,5 +92,8 @@ class JYoutubeList : JPanel() {
     this.onVideoNameChanged = videoNameChangeListener
   }
 
+  fun onVideoRetryClicked(onVideoRetryClicked: (youtubeItem: YoutubeItem) -> Unit) {
+    this.onVideoRetryClicked = onVideoRetryClicked
+  }
 
 }

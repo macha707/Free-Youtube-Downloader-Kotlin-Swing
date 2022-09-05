@@ -12,10 +12,11 @@ import java.util.concurrent.Future
 
 typealias NewVideoListener = (youtubeItem: YoutubeItem) -> Unit
 typealias ParsingListener = (isParsing: Boolean) -> Unit
+typealias ErrorListener = (error: Throwable) -> Unit
 
 interface IYoutubeParser {
-  fun parseVideo(videoUrl: String): YoutubeItem
-  fun parseVideoAsync(videoUrl: String): Future<YoutubeItem>
+  fun parseVideo(videoUrl: String): YoutubeItem?
+  fun parseVideoAsync(videoUrl: String): Future<YoutubeItem?>
 
   fun parsePlaylist(playlistUrl: String): List<YoutubeItem>
   fun parsePlaylistAsync(playlistUrl: String): Future<List<YoutubeItem>>
@@ -25,6 +26,7 @@ class YoutubeParser(private val youtubeDownloader: YoutubeDownloader) : IYoutube
 
   private var onNewVideo: NewVideoListener = { }
   private var onParsing: ParsingListener = { }
+  private var onError: ErrorListener = { }
 
   private val executor = Executors.newFixedThreadPool(4)
 
@@ -36,14 +38,19 @@ class YoutubeParser(private val youtubeDownloader: YoutubeDownloader) : IYoutube
     if (youtubeUrl.contains("playlist")) parsePlaylist(youtubeUrl) else parseVideo(youtubeUrl)
   }
 
-  override fun parseVideo(videoUrl: String): YoutubeItem {
+  override fun parseVideo(videoUrl: String): YoutubeItem? {
     onParsing.invoke(true)
-    val videoId = Regex(Constants.VIDEO_ID_REGEX).find(videoUrl)!!.groupValues[2]
-    val videoInfo = youtubeDownloader.getVideoInfo(RequestVideoInfo(videoId)).data()
-
-    val youtubeItem = YoutubeItemFactory.createYoutubeItem(videoInfo)
-    onNewVideo.invoke(youtubeItem)
-    onParsing.invoke(false)
+    var youtubeItem: YoutubeItem? = null
+    runCatching {
+      val videoId = Regex(Constants.VIDEO_ID_REGEX).find(videoUrl)!!.groupValues[2]
+      val videoInfo = youtubeDownloader.getVideoInfo(RequestVideoInfo(videoId)).data()
+      youtubeItem = YoutubeItemFactory.createYoutubeItem(videoInfo)
+      onNewVideo.invoke(youtubeItem!!)
+    }.onFailure {
+      onError.invoke(it)
+    }.also {
+      onParsing.invoke(false)
+    }
     return youtubeItem
   }
 
@@ -51,19 +58,23 @@ class YoutubeParser(private val youtubeDownloader: YoutubeDownloader) : IYoutube
     val youtubeItems = mutableListOf<YoutubeItem>()
     onParsing.invoke(true)
 
-    val playlistId = Regex(Constants.PLAYLIST_ID_REGEX).find(playlistUrl)!!.groupValues[2]
-    val response = youtubeDownloader.getPlaylistInfo(RequestPlaylistInfo(playlistId))
-    val playlistInfo = response.data()
-
-    for (video in playlistInfo.videos()) {
-      val videoInfo = youtubeDownloader.getVideoInfo(RequestVideoInfo(video.videoId())).data()
-      val youtubeItem = YoutubeItemFactory.createYoutubeItem(videoInfo)
-      youtubeItems.add(youtubeItem)
-      onNewVideo.invoke(youtubeItem)
-
+    runCatching {
+      val playlistId = Regex(Constants.PLAYLIST_ID_REGEX).find(playlistUrl)!!.groupValues[2]
+      val response = youtubeDownloader.getPlaylistInfo(RequestPlaylistInfo(playlistId))
+      val playlistInfo = response.data()
+      for (video in playlistInfo.videos()) {
+        runCatching {
+          val videoInfo = youtubeDownloader.getVideoInfo(RequestVideoInfo(video.videoId())).data()
+          val youtubeItem = YoutubeItemFactory.createYoutubeItem(videoInfo)
+          youtubeItems.add(youtubeItem)
+          onNewVideo.invoke(youtubeItem)
+        }
+      }
+    }.onFailure {
+      onError.invoke(it)
     }
-    onParsing.invoke(false)
 
+    onParsing.invoke(false)
     return youtubeItems
   }
 
@@ -81,6 +92,10 @@ class YoutubeParser(private val youtubeDownloader: YoutubeDownloader) : IYoutube
 
   fun onParsing(onParsing: ParsingListener) {
     this.onParsing = onParsing
+  }
+
+  fun onError(onError: ErrorListener) {
+    this.onError = onError
   }
 
 }
